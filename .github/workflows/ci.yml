@@ -1,0 +1,36 @@
+# .github/workflows/ci.yml
+name: CI Test & Self-Heal
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest requests
+      - name: Run Pytest
+        run: python -m pytest
+
+  heal-on-failure:
+    needs: run-tests
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify LangGraph Agent
+        run: |
+          curl -X POST "${{ secrets.AGENT_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repo": "${{ github.repository }}",
+              "run_id": "${{ github.run_id }}",
+              "commit": "${{ github.sha }}"
+            }'
